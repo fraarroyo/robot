@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Battle Bot Web Controller</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#111; color:#eee; margin:0; padding:24px; }
+    .container { max-width:520px; margin:0 auto; }
+    h1 { text-align:center; }
+    .panel { background:#1f1f1f; border-radius:16px; padding:18px; margin-top:16px; }
+    label { display:block; margin:12px 0 6px; }
+    input[type=range] { width:100%; }
+    .actions { display:flex; gap:12px; margin-top:16px; }
+    button { flex:1; padding:14px; border:none; border-radius:10px; background:#2979ff; color:#fff; font-size:16px; cursor:pointer; }
+    button:active { background:#1b58bf; }
+    .status { text-align:center; margin-top:16px; font-size:14px; color:#bbb; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Battle Bot Web Controller</h1>
+    <div class="panel">
+      <label for="xRange">Turn Control (X)</label>
+      <input id="xRange" type="range" min="0" max="4095" value="2048" />
+      <label for="yRange">Forward/Backward (Y)</label>
+      <input id="yRange" type="range" min="0" max="4095" value="2048" />
+      <div class="actions">
+        <button id="emojiBtn">Emoji Face</button>
+        <button id="danceBtn">Dance</button>
+      </div>
+      <div class="status" id="status">Open this page from the robot's WiFi network.</div>
+    </div>
+  </div>
+  <script>
+    const xRange = document.getElementById('xRange');
+    const yRange = document.getElementById('yRange');
+    const emojiBtn = document.getElementById('emojiBtn');
+    const danceBtn = document.getElementById('danceBtn');
+    const status = document.getElementById('status');
+    let emoji = 0;
+    let dance = 0;
+    let lastSendTime = 0;
+
+    function sendControl() {
+      const now = Date.now();
+      if (now - lastSendTime < 100) return;
+      lastSendTime = now;
+      const x = xRange.value;
+      const y = yRange.value;
+      const url = `/control?x=${x}&y=${y}&e=${emoji}&d=${dance}`;
+      fetch(url)
+        .then(response => response.text())
+        .then(text => { status.textContent = text; })
+        .catch(() => { status.textContent = 'Unable to reach robot'; });
+      emoji = 0;
+      dance = 0;
+    }
+
+    xRange.addEventListener('input', sendControl);
+    yRange.addEventListener('input', sendControl);
+    emojiBtn.addEventListener('click', () => { emoji = 1; sendControl(); });
+    danceBtn.addEventListener('click', () => { dance = 1; sendControl(); });
+    setInterval(sendControl, 250);
+  </script>
+</body>
+</html>

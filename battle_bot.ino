@@ -8,6 +8,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_LEDBackpack.h>
 #include <WiFi.h>
+#include <WebServer.h>
 #include <WiFiUdp.h>
 #include <Servo.h>
 #include "config.h"
@@ -19,7 +20,87 @@ Servo legBL;
 Servo legBR;
 
 Adafruit_8x8matrix faceMatrix = Adafruit_8x8matrix();
+WebServer server(80);
 WiFiUDP joystickUDP;
+
+bool webControlActive = false;
+unsigned long webControlTimeout = 0;
+int webJoystickX = JOYSTICK_CENTER;
+int webJoystickY = JOYSTICK_CENTER;
+bool webEmoji = false;
+bool webDance = false;
+
+const char webAppHtml[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Battle Bot Web Controller</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#111; color:#eee; margin:0; padding:20px; }
+    .container { max-width:520px; margin:0 auto; }
+    h1 { text-align:center; }
+    .control { margin:16px 0; padding:16px; background:#1f1f1f; border-radius:16px; }
+    label { display:block; margin:10px 0 6px; }
+    input[type=range] { width:100%; }
+    button { width:100%; padding:14px; margin:10px 0; background:#2979ff; color:#fff; border:none; border-radius:10px; font-size:16px; cursor:pointer; }
+    button:active { background:#1c54b2; }
+    .row { display:flex; gap:10px; }
+    .row button { flex:1; }
+    .status { text-align:center; margin-top:12px; font-size:14px; color:#ccc; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Battle Bot Web Controller</h1>
+    <div class="control">
+      <label for="xRange">X Axis (Turn)</label>
+      <input id="xRange" type="range" min="0" max="4095" value="2048">
+      <label for="yRange">Y Axis (Forward/Back)</label>
+      <input id="yRange" type="range" min="0" max="4095" value="2048">
+      <div class="row">
+        <button id="emojiBtn">Emoji Face</button>
+        <button id="danceBtn">Dance</button>
+      </div>
+      <div class="status" id="status">Connected to robot</div>
+    </div>
+  </div>
+  <script>
+    const xRange = document.getElementById('xRange');
+    const yRange = document.getElementById('yRange');
+    const emojiBtn = document.getElementById('emojiBtn');
+    const danceBtn = document.getElementById('danceBtn');
+    const status = document.getElementById('status');
+    let emoji = 0;
+    let dance = 0;
+    let lastSend = 0;
+
+    function sendControl() {
+      const now = Date.now();
+      if (now - lastSend < 80) return;
+      lastSend = now;
+      const x = xRange.value;
+      const y = yRange.value;
+      const url = `/control?x=${x}&y=${y}&e=${emoji}&d=${dance}`;
+      fetch(url).then(r => r.text()).then(text => {
+        status.textContent = text;
+      }).catch(() => {
+        status.textContent = 'Cannot reach robot';
+      });
+      emoji = 0;
+      dance = 0;
+    }
+
+    xRange.addEventListener('input', sendControl);
+    yRange.addEventListener('input', sendControl);
+    emojiBtn.addEventListener('click', () => { emoji = 1; sendControl(); });
+    danceBtn.addEventListener('click', () => { dance = 1; sendControl(); });
+    setInterval(sendControl, 250);
+  </script>
+</body>
+</html>
+)rawliteral";
 
 // Sensor readings
 int distanceFront = 0;
@@ -90,6 +171,7 @@ void setup() {
   // Initialize WiFi and wireless joystick support
   initWiFi();
   initWirelessJoystick();
+  initWebServer();
 
   // Initialize face display
   initFaceDisplay();
@@ -125,8 +207,7 @@ void loop() {
 
   // Send data for debugging
   debugOutput();
-
-  delay(100); // 100ms loop time
+  server.handleClient();
 }
 
 // ============================================
@@ -270,6 +351,24 @@ void executeMovement() {
 }
 
 void readJoystick() {
+  if (webControlActive && millis() < webControlTimeout) {
+    joystickX = webJoystickX;
+    joystickY = webJoystickY;
+    joystickButtonPressed = false;
+    manualMode = true;
+    if (webEmoji) {
+      webEmoji = false;
+      startEmoji();
+    }
+    if (webDance) {
+      webDance = false;
+      startDance();
+    }
+    return;
+  }
+
+  webControlActive = false;
+
   if (WIFI_ENABLED && readWirelessJoystick()) {
     return;
   }
@@ -526,4 +625,37 @@ void initWirelessJoystick() {
   } else {
     Serial.println("Failed to start joystick UDP listener");
   }
+}
+
+void initWebServer() {
+  server.on("/", HTTP_GET, []() {
+    server.send_P(200, "text/html", webAppHtml);
+  });
+
+  server.on("/control", HTTP_GET, []() {
+    int x = server.hasArg("x") ? server.arg("x").toInt() : JOYSTICK_CENTER;
+    int y = server.hasArg("y") ? server.arg("y").toInt() : JOYSTICK_CENTER;
+    int e = server.hasArg("e") ? server.arg("e").toInt() : 0;
+    int d = server.hasArg("d") ? server.arg("d").toInt() : 0;
+
+    webJoystickX = constrain(x, 0, 4095);
+    webJoystickY = constrain(y, 0, 4095);
+    if (e != 0) {
+      webEmoji = true;
+    }
+    if (d != 0) {
+      webDance = true;
+    }
+    webControlActive = true;
+    webControlTimeout = millis() + WEB_CONTROL_TIMEOUT_MS;
+
+    server.send(200, "text/plain", "Web control active");
+  });
+
+  server.onNotFound([]() {
+    server.send(404, "text/plain", "Not found");
+  });
+
+  server.begin();
+  Serial.println("Web controller server started on port 80");
 }

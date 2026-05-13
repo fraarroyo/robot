@@ -89,6 +89,7 @@
 // ============================================
 #define JOYSTICK_WIFI_PORT      4210  // UDP port for joystick packets
 #define JOYSTICK_UDP_BUFFER_SIZE 64   // Packet buffer size
+#define WEB_CONTROL_TIMEOUT_MS  2500  // milliseconds to keep web control active
 
 // Wireless joystick packet format:
 //   X:2048 Y:2048 B:0
