@@ -43,7 +43,9 @@ const char webAppHtml[] PROGMEM = R"rawliteral(
     h1 { text-align:center; }
     .control { margin:16px 0; padding:16px; background:#1f1f1f; border-radius:16px; }
     label { display:block; margin:10px 0 6px; }
-    input[type=range] { width:100%; }
+    .joystick-wrapper { position:relative; width:100%; padding-top:100%; margin:20px 0; }
+    .joystick { position:absolute; top:0; left:0; right:0; bottom:0; border: 3px solid #444; border-radius:50%; background: radial-gradient(circle at center, #2a2a2a 0%, #121212 70%); touch-action:none; }
+    .handle { position:absolute; width:96px; height:96px; border-radius:50%; background:#2979ff; border:3px solid #fff; transform:translate(-50%, -50%); left:50%; top:50%; box-shadow:0 0 20px rgba(41,121,255,0.4); }
     button { width:100%; padding:14px; margin:10px 0; background:#2979ff; color:#fff; border:none; border-radius:10px; font-size:16px; cursor:pointer; }
     button:active { background:#1c54b2; }
     .row { display:flex; gap:10px; }
@@ -55,10 +57,11 @@ const char webAppHtml[] PROGMEM = R"rawliteral(
   <div class="container">
     <h1>Battle Bot Web Controller</h1>
     <div class="control">
-      <label for="xRange">X Axis (Turn)</label>
-      <input id="xRange" type="range" min="0" max="4095" value="2048">
-      <label for="yRange">Y Axis (Forward/Back)</label>
-      <input id="yRange" type="range" min="0" max="4095" value="2048">
+      <div class="joystick-wrapper">
+        <div id="joystick" class="joystick">
+          <div id="handle" class="handle"></div>
+        </div>
+      </div>
       <div class="row">
         <button id="emojiBtn">Emoji Face</button>
         <button id="danceBtn">Dance</button>
@@ -67,22 +70,33 @@ const char webAppHtml[] PROGMEM = R"rawliteral(
     </div>
   </div>
   <script>
-    const xRange = document.getElementById('xRange');
-    const yRange = document.getElementById('yRange');
+    const joystick = document.getElementById('joystick');
+    const handle = document.getElementById('handle');
     const emojiBtn = document.getElementById('emojiBtn');
     const danceBtn = document.getElementById('danceBtn');
     const status = document.getElementById('status');
     let emoji = 0;
     let dance = 0;
     let lastSend = 0;
+    let active = false;
+    let pointerId = null;
+    let xValue = 2048;
+    let yValue = 2048;
+
+    function clamp(val, min, max) {
+      return val < min ? min : val > max ? max : val;
+    }
+
+    function setHandle(left, top) {
+      handle.style.left = `${left}%`;
+      handle.style.top = `${top}%`;
+    }
 
     function sendControl() {
       const now = Date.now();
       if (now - lastSend < 80) return;
       lastSend = now;
-      const x = xRange.value;
-      const y = yRange.value;
-      const url = `/control?x=${x}&y=${y}&e=${emoji}&d=${dance}`;
+      const url = `/control?x=${xValue}&y=${yValue}&e=${emoji}&d=${dance}`;
       fetch(url).then(r => r.text()).then(text => {
         status.textContent = text;
       }).catch(() => {
@@ -92,8 +106,47 @@ const char webAppHtml[] PROGMEM = R"rawliteral(
       dance = 0;
     }
 
-    xRange.addEventListener('input', sendControl);
-    yRange.addEventListener('input', sendControl);
+    function updateJoystick(clientX, clientY) {
+      const rect = joystick.getBoundingClientRect();
+      const dx = clientX - (rect.left + rect.width / 2);
+      const dy = clientY - (rect.top + rect.height / 2);
+      const radius = rect.width / 2 - 48;
+      const dist = Math.min(Math.hypot(dx, dy), radius);
+      const angle = Math.atan2(dy, dx);
+      const boundedX = Math.cos(angle) * dist;
+      const boundedY = Math.sin(angle) * dist;
+      setHandle(50 + (boundedX / rect.width) * 100, 50 + (boundedY / rect.height) * 100);
+      xValue = clamp(Math.round(2048 + (boundedX / radius) * 2048), 0, 4095);
+      yValue = clamp(Math.round(2048 - (boundedY / radius) * 2048), 0, 4095);
+      sendControl();
+    }
+
+    function resetJoystick() {
+      xValue = 2048;
+      yValue = 2048;
+      setHandle(50, 50);
+      sendControl();
+    }
+
+    joystick.addEventListener('pointerdown', e => {
+      active = true;
+      pointerId = e.pointerId;
+      joystick.setPointerCapture(pointerId);
+      updateJoystick(e.clientX, e.clientY);
+    });
+
+    joystick.addEventListener('pointermove', e => {
+      if (!active || e.pointerId !== pointerId) return;
+      updateJoystick(e.clientX, e.clientY);
+    });
+
+    joystick.addEventListener('pointerup', e => {
+      if (e.pointerId !== pointerId) return;
+      active = false;
+      joystick.releasePointerCapture(pointerId);
+      resetJoystick();
+    });
+
     emojiBtn.addEventListener('click', () => { emoji = 1; sendControl(); });
     danceBtn.addEventListener('click', () => { dance = 1; sendControl(); });
     setInterval(sendControl, 250);
