@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="1200" height="900" viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg" version="1.1">
+  <style>
+    .box { fill:#f8f8f8; stroke:#333; stroke-width:2; }
+    .box-robot { fill:#fdf0d8; }
+    .box-controller { fill:#d8f0fd; }
+    .label { font-family: Arial, sans-serif; font-size:16px; fill:#111; }
+    .title { font-family: Arial, sans-serif; font-size:22px; font-weight:bold; }
+    .line { stroke:#333; stroke-width:2; marker-end:url(#arrow); }
+    .pin { font-family: Arial, sans-serif; font-size:14px; fill:#111; }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#333" />
+    </marker>
+  </defs>
+  <text x="40" y="40" class="title">Battle Bot Wiring Visualization</text>
+  <rect x="40" y="70" width="540" height="490" class="box box-robot" rx="20" ry="20"/>
+  <text x="80" y="110" class="label">Robot ESP32</text>
+  <line x1="80" y1="130" x2="580" y2="130" class="line"/>
+  <text x="80" y="160" class="pin">Servo FL signal: GPIO 26</text>
+  <text x="80" y="190" class="pin">Servo FR signal: GPIO 33</text>
+  <text x="80" y="220" class="pin">Servo BL signal: GPIO 17</text>
+  <text x="80" y="250" class="pin">Servo BR signal: GPIO 4</text>
+  <text x="80" y="290" class="pin">Ultrasonic front: TRIG 15, ECHO 14</text>
+  <text x="80" y="320" class="pin">Ultrasonic left: TRIG 13, ECHO 12</text>
+  <text x="80" y="350" class="pin">Ultrasonic right: TRIG 27, ECHO 35</text>
+  <text x="80" y="390" class="pin">LED matrix SDA: GPIO 21</text>
+  <text x="80" y="420" class="pin">LED matrix SCL: GPIO 22</text>
+  <text x="80" y="450" class="pin">Status LED: GPIO 5</text>
+  <text x="80" y="480" class="pin">Attack LED: GPIO 18</text>
+  <text x="80" y="510" class="pin">Joystick fallback X: GPIO 34, Y: GPIO 39, Button: GPIO 36</text>
+
+  <rect x="620" y="70" width="520" height="280" class="box box-controller" rx="20" ry="20"/>
+  <text x="660" y="110" class="label">Controller ESP32</text>
+  <line x1="660" y1="130" x2="1120" y2="130" class="line"/>
+  <text x="660" y="170" class="pin">Joystick X: GPIO 34</text>
+  <text x="660" y="200" class="pin">Joystick Y: GPIO 35</text>
+  <text x="660" y="230" class="pin">Emoji button: GPIO 32</text>
+  <text x="660" y="260" class="pin">Dance button: GPIO 25</text>
+
+  <text x="620" y="370" class="label">Wireless Link</text>
+  <rect x="620" y="385" width="520" height="140" class="box" rx="20" ry="20"/>
+  <text x="660" y="420" class="pin">Robot AP: BattleBotAP</text>
+  <text x="660" y="450" class="pin">Password: battlebot123</text>
+  <text x="660" y="480" class="pin">Robot IP: 192.168.4.1</text>
+  <text x="660" y="510" class="pin">UDP port: 4210</text>
+  <text x="660" y="540" class="pin">Controller port: 4211</text>
+
+  <line x1="420" y1="560" x2="780" y2="560" class="line"/>
+  <text x="520" y="590" class="label">Common power and ground:</text>
+  <text x="520" y="620" class="pin">- Robot ESP32, servos, LED matrix, sensors share ground</text>
+  <text x="520" y="650" class="pin">- Use separate 5V servo supply if needed</text>
+  <text x="520" y="680" class="pin">- Controller ESP32 powered via USB or 5V</text>
+</svg>
